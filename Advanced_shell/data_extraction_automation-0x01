@@ -37,5 +37,5 @@ else
     type=$(grep -A 10 '"types"' "$JSON_FILE" | grep -o '"name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' | sed 's/^./\u&/')
 fi
 
-# Format and display the output
+# Format and display the outputed
 echo "$name is of type $type, weighs ${formatted_weight}kg, and is ${height}m tall."
