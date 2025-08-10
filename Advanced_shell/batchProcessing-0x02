@@ -1,0 +1,58 @@
+#!/bin/bash
+
+# Batch Processing - Task 2
+# Fetches data for multiple Pokemon with error handling and retry logic
+
+POKEMON_LIST=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
+OUTPUT_DIR="pokemon_data"
+ERROR_FILE="errors.txt"
+MAX_RETRIES=3
+DELAY=1  # seconds between requests to handle rate limiting
+
+# Create output directory if it doesn't exist
+mkdir -p "$OUTPUT_DIR"
+
+# Function to fetch Pokemon data with retry logic
+fetch_pokemon() {
+    local pokemon_name="$1"
+    local output_file="$OUTPUT_DIR/${pokemon_name}.json"
+    local api_url="https://pokeapi.co/api/v2/pokemon/${pokemon_name}"
+    local retry_count=0
+    
+    echo "Fetching data for $pokemon_name..."
+    
+    while [[ $retry_count -lt $MAX_RETRIES ]]; do
+        if curl -s -o "$output_file" "$api_url"; then
+            # Verify the response is valid JSON
+            if jq . "$output_file" > /dev/null 2>&1; then
+                echo "Saved data to $output_file ✅"
+                return 0
+            else
+                echo "Invalid JSON response for $pokemon_name (attempt $((retry_count + 1)))"
+            fi
+        else
+            echo "Failed to fetch $pokemon_name (attempt $((retry_count + 1)))"
+        fi
+        
+        retry_count=$((retry_count + 1))
+        
+        if [[ $retry_count -lt $MAX_RETRIES ]]; then
+            echo "Retrying in 2 seconds..."
+            sleep 2
+        fi
+    done
+    
+    # Log error after all retries failed
+    echo "❌ Failed to fetch $pokemon_name after $MAX_RETRIES attempts" | tee -a "$ERROR_FILE"
+    echo "Error occurred at: $(date) for Pokemon: $pokemon_name" >> "$ERROR_FILE"
+    return 1
+}
+
+# Main execution
+for pokemon in "${POKEMON_LIST[@]}"; do
+    fetch_pokemon "$pokemon"
+    # Add delay between requests to handle rate limiting
+    sleep $DELAY
+done
+
+echo "Batch processing completed. Check $ERROR_FILE for any errors."

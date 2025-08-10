@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# Debug script to check API response
+API_URL="https://pokeapi.co/api/v2/pokemon/pikachu"
+
+echo "=== Debugging API Request ==="
+echo "URL: $API_URL"
+echo ""
+
+# Test basic connectivity
+echo "1. Testing basic curl connectivity:"
+curl -s -I "$API_URL" | head -5
+echo ""
+
+# Test with verbose output
+echo "2. Testing with verbose curl output:"
+curl -v -s -o test_response.json "$API_URL" 2>&1 | grep -E "(HTTP|Host|Connection|Content-Type)"
+echo ""
+
+# Check what we got
+echo "3. Response file info:"
+if [[ -f "test_response.json" ]]; then
+    echo "File size: $(wc -c < test_response.json) bytes"
+    echo "File type: $(file test_response.json)"
+    echo ""
+    
+    echo "4. First few lines of response:"
+    head -10 test_response.json
+    echo ""
+    
+    echo "5. Testing JSON validity:"
+    if jq . test_response.json > /dev/null 2>&1; then
+        echo "✅ Valid JSON response"
+        echo "Pokemon name: $(jq -r '.name' test_response.json)"
+    else
+        echo "❌ Invalid JSON response"
+        echo "jq error:"
+        jq . test_response.json 2>&1 | head -3
+    fi
+else
+    echo "❌ No response file created"
+fi
+
+# Clean up
+rm -f test_response.json
