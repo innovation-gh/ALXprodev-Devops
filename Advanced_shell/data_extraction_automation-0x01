@@ -11,11 +11,31 @@ if [[ ! -f "$JSON_FILE" ]]; then
     exit 1
 fi
 
-# Extract data using jq
-NAME=$(jq -r '.name' "$JSON_FILE" | sed 's/^./\u&/')  # Capitalize first letter
-HEIGHT=$(jq -r '.height' "$JSON_FILE" | awk '{printf "%.1f", $1/10}')  # Convert from decimeters to meters
-WEIGHT=$(jq -r '.weight' "$JSON_FILE" | awk '{printf "%.0f", $1/10}')  # Convert from hectograms to kg
-TYPE=$(jq -r '.types[0].type.name' "$JSON_FILE" | sed 's/^./\u&/')  # Get first type and capitalize
+# Check if jq is available
+if command -v jq >/dev/null 2>&1; then
+    # Extract data using jq
+    name=$(jq -r '.name' "$JSON_FILE" | sed 's/^./\u&/')  # Capitalize first letter
+    height=$(jq -r '.height' "$JSON_FILE" | awk '{printf "%.1f", $1/10}')  # Convert from decimeters to meters
+    formatted_weight=$(jq -r '.weight' "$JSON_FILE" | awk '{printf "%.0f", $1/10}')  # Convert from hectograms to kg
+    type=$(jq -r '.types[0].type.name' "$JSON_FILE" | sed 's/^./\u&/')  # Get first type and capitalize
+else
+    # Fallback: Extract data using grep, sed, and awk
+    echo "jq not found, using fallback method..."
+    
+    # Extract name (look for "name": "value" pattern)
+    name=$(grep -o '"name"[[:space:]]*:[[:space:]]*"[^"]*"' "$JSON_FILE" | head -1 | sed 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' | sed 's/^./\u&/')
+    
+    # Extract height (look for "height": number pattern)
+    height_dm=$(grep -o '"height"[[:space:]]*:[[:space:]]*[0-9]*' "$JSON_FILE" | sed 's/.*"height"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/')
+    height=$(echo "$height_dm" | awk '{printf "%.1f", $1/10}')
+    
+    # Extract weight (look for "weight": number pattern)
+    weight_hg=$(grep -o '"weight"[[:space:]]*:[[:space:]]*[0-9]*' "$JSON_FILE" | sed 's/.*"weight"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/')
+    formatted_weight=$(echo "$weight_hg" | awk '{printf "%.0f", $1/10}')
+    
+    # Extract type (look for the first type name in types array)
+    type=$(grep -A 10 '"types"' "$JSON_FILE" | grep -o '"name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' | sed 's/^./\u&/')
+fi
 
 # Format and display the output
-echo "$NAME is of type $TYPE, weighs ${WEIGHT}kg, and is ${HEIGHT}m tall."
+echo "$name is of type $type, weighs ${formatted_weight}kg, and is ${height}m tall."

@@ -13,15 +13,29 @@ echo "Fetching Pikachu data from Pokemon API..."
 if curl -s -o "$OUTPUT_FILE" "$API_URL"; then
     # Check if the file was created and has content
     if [[ -f "$OUTPUT_FILE" && -s "$OUTPUT_FILE" ]]; then
-        # Check if the response is valid JSON and not an error page
-        if jq . "$OUTPUT_FILE" > /dev/null 2>&1; then
-            echo "✅ Successfully saved Pikachu data to $OUTPUT_FILE"
+        # Check if the response is valid JSON
+        if command -v jq >/dev/null 2>&1; then
+            # Use jq to validate JSON
+            if jq . "$OUTPUT_FILE" > /dev/null 2>&1; then
+                echo "✅ Successfully saved Pikachu data to $OUTPUT_FILE"
+            else
+                echo "❌ Invalid JSON response received" | tee -a "$ERROR_FILE"
+                echo "Response content:" >> "$ERROR_FILE"
+                head -10 "$OUTPUT_FILE" >> "$ERROR_FILE"
+                echo "---" >> "$ERROR_FILE"
+                exit 1
+            fi
         else
-            echo "❌ Invalid JSON response received" | tee -a "$ERROR_FILE"
-            echo "Response content:" >> "$ERROR_FILE"
-            head -10 "$OUTPUT_FILE" >> "$ERROR_FILE"
-            echo "---" >> "$ERROR_FILE"
-            exit 1
+            # Fallback validation: check for basic JSON structure
+            if grep -q '"name".*"height".*"weight".*"types"' "$OUTPUT_FILE"; then
+                echo "✅ Successfully saved Pikachu data to $OUTPUT_FILE (validation without jq)"
+            else
+                echo "❌ Response doesn't appear to be valid Pokemon data" | tee -a "$ERROR_FILE"
+                echo "Response content:" >> "$ERROR_FILE"
+                head -10 "$OUTPUT_FILE" >> "$ERROR_FILE"
+                echo "---" >> "$ERROR_FILE"
+                exit 1
+            fi
         fi
     else
         echo "❌ No data received from API" | tee -a "$ERROR_FILE"
